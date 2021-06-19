@@ -79,7 +79,8 @@ Die IoT-Devices umfassen folgende Komponenten:
 
  * `redis`: Zentraler Redis-Server
  * `sensor`: Python-Programm zum Auslesen der Sensordaten und Ablage in Redis
- * `startstopbutton`: Python-Programm zum Starten und Stoppen der Sensormessungen
+ * `startstopbutton`: Python-Programm zum Starten und Stoppen der Sensormessungen <br/>
+   **Vorsicht:** Dieser belegt den GPIO-Pin 2, der u.a. auch für I²C benutzt wird!
  * `mqtthandler`: Python-Programm zum Versand der Sensordaten via MQTT
  * `grafana`: Lokales Grafana-Dashboard zur Überwachung der Devices
 
