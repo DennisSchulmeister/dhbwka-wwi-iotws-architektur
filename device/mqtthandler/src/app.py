@@ -24,10 +24,10 @@ class App:
       * topic_request: Aus diesem Topic werden Befehle für ein einzelnes
             Device ausgelesen. Das Topic muss daher die Device UUID im
             Namen enthalten.
-    
+
       * topic_response: An dieses Topic wird die Antwort auf einen empfangen
             Befehl gesendet, falls dieser eine Antwort erfordert. QOS = 0.
-    
+
     Die Sensordaten werden als UTF-8 kodierte JSON-Liste im folgenden
     Format versendet:
 
@@ -52,7 +52,7 @@ class App:
                 …
             }
         ]
-    
+
     Jeder Eintrag entspricht dabei einem JSON-Objekt mit genau einer Messung.
     `_id` ist die ID des Messwertes aus der Redis-Datenbank und entspricht
     daher dem Unix Timestamp mit einer angehängten Laufnummer. Alle anderen
@@ -80,7 +80,7 @@ class App:
 
         Konfigurationswert in Redis ändern. Liefert folgende Antwort:
         {"command: "set_config", "key": "xxx", "value": "yyy"}
-    
+
       * {"command": "send_measurements": "min_id": "-", "max_id": "+", "count": 999}
 
         Direkte Abfrage von Messwerten innerhalb des gegebenen Ranges.
@@ -90,20 +90,20 @@ class App:
 
         Die Antwort wird an das `topic_values` im selben Format gesendet,
         wie beim automatischen Versand der Messwerte.
-    
+
     Die zulässigen Konfigurationswerte werden hier nicht geprüft, um bei
     Einführung weiterer Werte das Programm nicht ständig erweitern zu
     müssen. Sie werden stattdessen unter dem angegebenen Key direkt in der
     Redis-Datenbank abgelegt. Die anderen Programme lesen sie dann ggf.
     regelmäßig aus der Datenbank aus, um ihr Verhalten anzupassen. Die
     MQTT-Kommunikation sollte daher entsprechend abgesichert werden.
-    
+
     Dieses Programm reagiert auf folgende Konfigurationswerte:
 
       * mqtt_sender:interval  ->  Sendeintervall in Sekunden
       * mqtt_sender:enabled   ->  1 = Versand aktiv, 0 = Versand gestoppt
       * mqtt_sender:last_id   ->  Versand ab folgender ID wiederholen
-    
+
     Bei `mqtt_sender:last_id` sollte die übermittelte ID mit einer runden
     Klammer beginnen, um alle Messungen **nach** dieser ID zu liefern.
     """
@@ -116,7 +116,7 @@ class App:
         # Logger konfigurieren
         self._logger = logging.getLogger()
         self._logger.setLevel(logging.INFO)
-    
+
         formatter = logging.Formatter("[%(asctime)s] %(message)s")
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
@@ -162,10 +162,11 @@ class App:
             "keepalive":       os.getenv("MQTT_KEEPALIVE_SECONDS") or self._config["mqtt"]["keepalive_seconds"],
             "username":        os.getenv("MQTT_USERNAME")          or self._config["mqtt"]["username"],
             "password":        os.getenv("MQTT_PASSWORD")          or self._config["mqtt"]["password"],
+            "tls_enable":      os.getenv("MQTT_TLS_ENABLE")        or self._config["mqtt"]["tls_enable"],
             "tls_insecure":    os.getenv("MQTT_TLS_INSECURE")      or self._config["mqtt"]["tls_insecure"],
-            "tls_ca_certs":    os.getenv("MQTT_TLS_CA_CERTS")      or self._config["mqtt"]["tls_ca_certs"],
-            "tls_certfile":    os.getenv("MQTT_TLS_CERTFILE")      or self._config["mqtt"]["tls_certfile"],
-            "tls_keyfile":     os.getenv("MQTT_TLS_KEYFILE")       or self._config["mqtt"]["tls_keyfile"],
+            "tls_ca_certs":    os.getenv("MQTT_TLS_CA_CERTS")      or self._config["mqtt"]["tls_ca_certs"] or None,
+            "tls_certfile":    os.getenv("MQTT_TLS_CERTFILE")      or self._config["mqtt"]["tls_certfile"] or None,
+            "tls_keyfile":     os.getenv("MQTT_TLS_KEYFILE")       or self._config["mqtt"]["tls_keyfile"]  or None,
             "topic_broadcast": os.getenv("MQTT_TOPIC_BROADCAST")   or self._config["mqtt"]["topic_broadcast"],
             "topic_request":   os.getenv("MQTT_TOPIC_REQUEST")     or self._config["mqtt"]["topic_request"],
             "topic_response":  os.getenv("MQTT_TOPIC_RESPONSE")    or self._config["mqtt"]["topic_response"],
@@ -174,6 +175,7 @@ class App:
 
         self._mqtt_config["port"]            = int(self._mqtt_config["port"])
         self._mqtt_config["keepalive"]       = int(self._mqtt_config["keepalive"])
+        self._mqtt_config["tls_enable"]      = self._mqtt_config["tls_enable"].upper() == "TRUE"
         self._mqtt_config["tls_insecure"]    = self._mqtt_config["tls_insecure"].upper() == "TRUE"
         self._mqtt_config["topic_broadcast"] = self._mqtt_config["topic_broadcast"] % self._balena
         self._mqtt_config["topic_request"]   = self._mqtt_config["topic_request"]   % self._balena
@@ -187,14 +189,17 @@ class App:
         self._mqtt.on_disconnect = self._on_mqtt_disconnect
 
         self._mqtt.connect(host=self._mqtt_config["host"], port=self._mqtt_config["port"], keepalive=self._mqtt_config["keepalive"])
-        
+
         if self._mqtt_config["tls_ca_certs"] or self._mqtt_config["tls_certfile"] or self._mqtt_config["tls_keyfile"]:
             self._logger.info(
                 "Setze TLS-Parameter für die MQTT-Verbindung: "
                 "tls_ca_certs=%(tls_ca_certs)s, tls_certfile=%(tls_certfile)s, tls_keyfile=%(tls_keyfile)s" % self._mqtt_config
             )
 
-            self._mqtt.tls_set(ca_certs=self._mqtt_config["tls_ca_certs"], certfile=self._mqtt_config["tls_certfile"], keyfile=self._mqtt_config["tls_keyfile"])
+            self._mqtt.tls_set(tls_version=ssl.PROTOCOL_TLS, ca_certs=self._mqtt_config["tls_ca_certs"], certfile=self._mqtt_config["tls_certfile"], keyfile=self._mqtt_config["tls_keyfile"])
+        elif self._mqtt_config["tls_enable"]:
+            self._logger.info("Aktiviere TLS/SSL-Verschlüsselung")
+            self._mqtt.tls_set(tls_version=ssl.PROTOCOL_TLS)
 
         if self._mqtt_config["tls_insecure"]:
             self._logger.info("Erlaube unsichere TLS-Zertifikate für die Verbindung zum MQTT-Broker")
@@ -241,7 +246,7 @@ class App:
 
         if enabled == None:
             return self._enabled
-        
+
         enabled = enabled != "0"
 
         if not enabled == self._enabled:
@@ -260,13 +265,13 @@ class App:
 
         if interval_seconds == None:
             return self._interval_seconds
-        
+
         interval_seconds = float(interval_seconds)
 
         if not interval_seconds == self._interval_seconds:
             self._interval_seconds = interval_seconds
             self._logger.info("Neues Sendeintervall: %s Sekunde(n)" % interval_seconds)
-        
+
         return interval_seconds
 
     def _read_sender_last_id(self):
@@ -279,11 +284,11 @@ class App:
 
         if last_id == None:
             return self._last_id
-        
+
         if not last_id == self._last_id:
             self._last_id = last_id
             self._logger.info("Vormerkung für Versand der Messwerte ab ID %s" % last_id)
-        
+
         return last_id
 
     def _save_sender_last_id(self, last_id):
@@ -293,7 +298,7 @@ class App:
         """
         self._last_id = last_id
         self._redis.set(REDIS_KEY_MQTT_SENDER_LAST_ID, last_id)
-    
+
     def _read_measurements(self, min_id="-", max_id="+", count=None):
         """
         Liest den Redis-Stream REDIS_KEY_MEASUREMENT_VALUES mit den aktuellsten Messwerten
@@ -303,7 +308,7 @@ class App:
         am Anfang) mitgegeben, um alle nachfolgenden Messungen zu ermitteln. Es können aber
         auch Unix Timestamps mitgegeben werden, um die gepufferten Messwerte eines bestimmten
         Zeitraums zu erhalten.
-        
+
         Die Methode gibt immer genau zwei Werte zurück:
 
             1) Die Messwerte so, wie sie der XRANGE-Befehl von Redis liefert: Als Liste mit
@@ -316,11 +321,11 @@ class App:
                     ("1621122797943-0", {"temperature_celsius": "20.8", "humidity_percent": "72"}),
                     ("1621122798948-0", {"temperature_celsius": "20.1", "humidity_percent": "76"}),
                 ]
-            
+
             2) Die ID des letzten Messwertes mit vorangestellter runder Klammer, da dieser
                Wert dann direkt beim nächsten Aufruf der Methode verwendet werden kann, um
                alle Messungen **nach** dieser ID zu ermitteln.
-        
+
         Wurden keine Messwerte gefunden, liefert die Methode eine leere Liste sowie die
         letzte ID des vorherigen Aufrufs zurück.
         """
@@ -354,9 +359,9 @@ class App:
 
             for key in measurement[1]:
                 simplified_measurement[key] = measurement[1][key]
-            
+
             simplified_measurements.append(simplified_measurement)
-        
+
         # JSON-String erzeugen und versenden
         self._logger.info("Sende Messwerte %(min_id)s bis %(max_id)s, Anzahl %(count)s" % {
             "min_id": simplified_measurements[0]["_id"],
@@ -400,7 +405,7 @@ class App:
             self._mqtt.message_callback_add(self._mqtt_config["topic_request"], self._on_mqtt_command_received)
         else:
             self._mqtt_connected = False
-        
+
     def _on_mqtt_disconnect(self, client, userdata, rc):
         """
         Verhindert den weiteren Versand von Messwerten, solange keine Verbindung
@@ -421,7 +426,7 @@ class App:
             self._logger.info("Empfange Broadcast an alle Devices: %s" % message.payload)
         else:
             self._logger.info("Empfange Kommando für dieses Device: %s" % message.payload)
-        
+
         payload = json.loads(message.payload)
         command = payload.get("command", "").upper()
 
@@ -456,7 +461,7 @@ class App:
                         "value": config_value,
                     }),
                 )
-        
+
         # Konfigurationswert ändern
         elif command == "SET_CONFIG":
             config_key = payload.get("key", "")
@@ -475,7 +480,7 @@ class App:
                         "value": config_value,
                     })
                 )
-    
+
         # Messwerte abfragen
         elif command == "SEND_MEASUREMENTS":
             kwargs = {
@@ -489,10 +494,10 @@ class App:
 
             self._logger.info("Ermittle Messwerte: min_id=%(min_id)s, max_id=%(max_id)s, count=%(count)s" % kwargs)
             measurements = self._read_measurements(**kwargs)[0]
-            
+
             if measurements:
                 self._send_measurements(measurements)
-        
+
         # Sonstiger, unbekannter Befehl
         else:
             self._logger.info("Unbekanntes Kommando: %s" % command)
