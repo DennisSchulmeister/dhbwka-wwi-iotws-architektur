@@ -8,7 +8,7 @@ Dieses Programm liest regelmäßig die neusten Messwerte aus der Redis-Datenbank
 und versendet diese via MQTT an den Rest der Welt. Das Programm merkt sich dabei
 in der Datenbank, welcher Messwert als letztes verschickt wurde und stellt sicher,
 dass bei jedem Durchlauf alle nachfolgenden Werte versendet werden. Selbst wenn
-das Programm mal eine Weile nicht läuft, gehen keine Messwerte verlorsen. Der
+das Programm mal eine Weile nicht läuft, gehen keine Messwerte verloren. Der
 Versand wird einfach beim nächsten Programmstart nachgeholt.
 
 Zusätzlich implementiert das Programm ein einfaches Protokoll, um die Devices
