@@ -1,0 +1,21 @@
+FROM balenalib/raspberrypi3-debian-python:3.9.7-bullseye-build AS compile-image
+ENV VENV_PATH=/usr/src/app/venv
+RUN python -m venv $VENV_PATH
+ENV PATH=$VENV_PATH/bin:$PATH \
+    CFLAGS=-fcommon \
+    APP_SOURCE_FOLDER=/usr/src/app
+COPY requirements.txt .
+COPY src/. $APP_SOURCE_FOLDER
+ENV PIP_ALIAS=$VENV_PATH/bin/pip3
+RUN $PIP_ALIAS install --upgrade pip &&\
+    $PIP_ALIAS install wheel==0.37.0 &&\
+    $PIP_ALIAS install -r requirements.txt
+
+FROM balenalib/raspberry-pi-alpine-python:3.9.7-run AS build-image
+ENV APP_INSTALL_FOLDER=/usr/src/app
+ENV PATH=$APP_INSTALL_FOLDER/venv/bin:$APP_INSTALL_FOLDER/venv/lib/python3.9/site-packages/:$PATH
+WORKDIR $APP_INSTALL_FOLDER
+RUN mkdir $APP_INSTALL_FOLDER/data &&\
+    install_packages libc6-compat
+COPY --from=compile-image $APP_INSTALL_FOLDER $APP_INSTALL_FOLDER
+CMD python app.py
