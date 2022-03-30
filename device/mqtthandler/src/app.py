@@ -1,7 +1,7 @@
 #! /bin/env python
 
 import redis, paho.mqtt.client as mqtt
-import configparser, json, logging, os, subprocess, time, sys
+import configparser, json, logging, os, subprocess, time, sys, ssl
 
 REDIS_KEY_MEASUREMENT_VALUES   = "measurement:values"
 REDIS_KEY_MQTT_SENDER_INTERVAL = "mqtt_sender:interval"
