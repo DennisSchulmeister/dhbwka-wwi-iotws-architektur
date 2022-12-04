@@ -5,7 +5,7 @@ Beschreibung
 ------------
 
 Dieser Container stellt ein lokales Grafana-Dashboard zur Verfügung, das als Webserver
-auf dem IoT-Device läuft. Das Dashboard kann unter die Portnummer 3000 erreicht werden.
+auf dem IoT-Device läuft. Das Dashboard kann unter der Portnummer 3000 erreicht werden.
 Die Anmeldedaten sind (aus dem Vorlage-Container von Grafana):
 
     Benutzer: admin
