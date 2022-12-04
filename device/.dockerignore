@@ -1,0 +1,28 @@
+######################################################################
+# Dateien, die von Docker und dem Balena CLI ingoriert werden sollen #
+######################################################################
+
+# Temporäre Dateien beim Sicherin mit GLib
+.goutputstream*
+
+# Python-typische Cache-Dateien
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
